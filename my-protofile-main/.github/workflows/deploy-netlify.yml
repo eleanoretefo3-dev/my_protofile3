@@ -1,0 +1,47 @@
+name: Deploy to Netlify
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    if: ${{ secrets.NETLIFY_AUTH_TOKEN && secrets.NETLIFY_SITE_ID }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install root (ensures correct npm)
+        run: npm --version
+
+      - name: Install dependencies (project)
+        working-directory: project
+        run: npm ci
+
+      - name: Build (project)
+        working-directory: project
+        env:
+          CI: true
+        run: npm run build
+
+      - name: Move dist to repo root
+        run: |
+          rm -rf dist
+          mkdir -p dist
+          cp -R project/dist/* dist/
+
+      - name: Deploy to Netlify (Production)
+        uses: netlify/actions/cli@v4
+        with:
+          args: deploy --dir=dist --prod --message "GitHub Actions deploy"
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
